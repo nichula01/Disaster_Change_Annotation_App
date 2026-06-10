@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FM Flood Mask Correction Tool</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<!-- ── Top Status Bar ── -->
+<div class="top-status-bar" id="topStatusBar">
+    <div class="status-items">
+        <span class="status-item" id="statusSample">Sample: —</span>
+        <span class="status-sep">|</span>
+        <span class="status-chip chip-missing" id="statusOn">ON: not loaded</span>
+        <span class="status-chip chip-missing" id="statusBefore">BEFORE: not loaded</span>
+        <span class="status-chip chip-missing" id="statusFm">FM: not loaded</span>
+        <span class="status-sep">|</span>
+        <span class="status-item" id="statusTool">Tool: —</span>
+        <span class="status-sep">|</span>
+        <span class="status-item" id="statusBrush">Brush: 20px</span>
+        <span class="status-sep">|</span>
+        <span class="status-item" id="statusZoom">Zoom: 100%</span>
+        <span class="status-sep status-unsaved-sep hidden" id="unsavedSep">|</span>
+        <span class="status-unsaved hidden" id="statusUnsaved">● Unsaved</span>
+    </div>
+    <div class="status-right">
+        <button class="help-btn" id="btnHelp" title="Help (H or ?)">? Help</button>
+    </div>
+</div>
+
+<!-- ── App Layout ── -->
+<div class="app-container">
+
+    <!-- ── Sidebar ── -->
+    <aside class="sidebar" id="sidebar">
+
+        <div class="sidebar-logo">
+            <div class="logo-text">FloodAnnotator <span class="logo-badge">FM</span></div>
+            <div class="logo-sub">Foundation-Model Mask Correction</div>
+        </div>
+
+        <!-- 1. Sample Loading -->
+        <div class="ctrl-group">
+            <div class="group-header" data-target="loadContent">
+                <span>1. Sample Loading</span><span class="chevron">▾</span>
+            </div>
+            <div class="group-content" id="loadContent">
+                <div class="file-row">
+                    <label for="onImageInput" class="file-btn btn-on" title="Image captured during or after the flood event (base image)">Load ON/FLOOD Image</label>
+                    <input type="file" id="onImageInput" accept="image/*">
+                    <span class="file-name" id="onImageName">No file selected</span>
+                </div>
+                <div class="file-row">
+                    <label for="beforeImageInput" class="file-btn btn-before" title="Image captured before the flood event (comparison)">Load BEFORE Image</label>
+                    <input type="file" id="beforeImageInput" accept="image/*">
+                    <span class="file-name" id="beforeImageName">No file selected</span>
+                </div>
+                <div class="file-row">
+                    <label for="fmMaskInput" class="file-btn btn-fm" title="Approximate binary mask from foundation model — becomes your starting mask">Load FM Approx. Mask</label>
+                    <input type="file" id="fmMaskInput" accept="image/*">
+                    <span class="file-name" id="fmMaskName">No file selected</span>
+                </div>
+                <div class="file-row">
+                    <label for="existingMaskInput" class="file-btn btn-existing" title="Optional: load a previously saved final mask to continue editing">Load Existing Final Mask</label>
+                    <input type="file" id="existingMaskInput" accept="image/*">
+                    <span class="file-name" id="existingMaskName">No file selected</span>
+                </div>
+
+                <div id="dimMismatchBox" class="dim-mismatch-box hidden">
+                    <p>⚠ Image and mask dimensions do not match.</p>
+                    <div class="dim-mismatch-btns">
+                        <button id="btnResizeMask" class="small-btn warn-small-btn">Resize Mask to Image</button>
+                        <button id="btnCancelMaskLoad" class="small-btn">Cancel</button>
+                    </div>
+                </div>
+
+                <div class="drop-hint" id="dropHint">
+                    Drop up to 3 files here<br>
+                    <small>Auto-detects: before / on / mask</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Sample Info -->
+        <div class="ctrl-group">
+            <div class="group-header collapsed" data-target="infoContent">
+                <span>2. Sample Info</span><span class="chevron">▾</span>
+            </div>
+            <div class="group-content hidden" id="infoContent">
+                <div class="field-group">
+                    <label class="field-label">Pair / Sample ID</label>
+                    <input type="text" id="pairIdInput" class="text-input" placeholder="e.g. flood_0001">
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Annotator Name / ID</label>
+                    <input type="text" id="annotatorInput" class="text-input" placeholder="e.g. ann_01">
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Quality Status</label>
+                    <select id="qualitySelect" class="select-input">
+                        <option value="draft">Draft</option>
+                        <option value="review">Review</option>
+                        <option value="accepted">Accepted</option>
+                        <option value="rejected">Rejected</option>
+                    </select>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Notes</label>
+                    <textarea id="notesInput" class="textarea-input" placeholder="Annotation notes..." rows="3"></textarea>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. View Controls -->
+        <div class="ctrl-group">
+            <div class="group-header collapsed" data-target="viewContent">
+                <span>3. View Controls</span><span class="chevron">▾</span>
+            </div>
+            <div class="group-content hidden" id="viewContent">
+                <div class="slider-row">
+                    <label>BEFORE Opacity <span id="beforeOpacityVal">0.50</span></label>
+                    <input type="range" id="beforeOpacity" min="0" max="1" step="0.05" value="0.5">
+                </div>
+                <div class="slider-row">
+                    <label>Final Mask Opacity <span id="maskOpacityVal">0.60</span></label>
+                    <input type="range" id="maskOpacity" min="0" max="1" step="0.05" value="0.6">
+                </div>
+                <div class="slider-row">
+                    <label>FM Reference Opacity <span id="fmOpacityVal">0.50</span></label>
+                    <input type="range" id="fmOpacity" min="0" max="1" step="0.05" value="0.5">
+                </div>
+                <div class="toggle-list">
+                    <label class="toggle-item">
+                        <input type="checkbox" id="toggleBefore" checked> Show BEFORE overlay
+                    </label>
+                    <label class="toggle-item">
+                        <input type="checkbox" id="toggleFinalMask" checked> Show final mask <em>(red)</em>
+                    </label>
+                    <label class="toggle-item">
+                        <input type="checkbox" id="toggleFmRef"> Show FM reference <em>(orange)</em>
+                    </label>
+                    <label class="toggle-item">
+                        <input type="checkbox" id="toggleDiff"> Show correction diff overlay
+                    </label>
+                </div>
+                <div class="slider-row" style="margin-top:10px">
+                    <label>Display Quality <span id="renderScaleVal">2x</span></label>
+                    <select id="renderScale" class="select-input">
+                        <option value="1">1x (Fast)</option>
+                        <option value="1.5">1.5x</option>
+                        <option value="2" selected>2x (Sharp)</option>
+                        <option value="3">3x (Sharpest)</option>
+                    </select>
+                </div>
+                <button id="btnResetView" class="full-btn secondary-btn" title="Fit image to screen (key: 0)">Fit to Screen</button>
+            </div>
+        </div>
+
+        <!-- 4. Annotation Tools -->
+        <div class="ctrl-group">
+            <div class="group-header" data-target="toolsContent">
+                <span>4. Annotation Tools</span><span class="chevron">▾</span>
+            </div>
+            <div class="group-content" id="toolsContent">
+                <div class="tool-grid">
+                    <button id="btnAddFlood" class="tool-btn tool-add active" title="Add Flood/Change — paints WHITE pixels (key: A)">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <circle cx="12" cy="12" r="9"/>
+                            <line x1="12" y1="8" x2="12" y2="16"/>
+                            <line x1="8" y1="12" x2="16" y2="12"/>
+                        </svg>
+                        <span>Add Flood</span>
+                    </button>
+                    <button id="btnRemoveFlood" class="tool-btn tool-remove" title="Remove Flood/Change — paints BLACK pixels (key: R)">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <circle cx="12" cy="12" r="9"/>
+                            <line x1="8" y1="12" x2="16" y2="12"/>
+                        </svg>
+                        <span>Remove Flood</span>
+                    </button>
+                    <button id="btnPan" class="tool-btn tool-pan" title="Pan / Move view (key: P or hold Space)">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M5 9l-3 3 3 3M9 5l3-3 3 3M19 9l3 3-3 3M9 19l3 3 3 3M2 12h20M12 2v20"/>
+                        </svg>
+                        <span>Pan</span>
+                    </button>
+                </div>
+
+                <div class="slider-row">
+                    <label>Brush Size <span id="brushSizeVal">20</span>px</label>
+                    <input type="range" id="brushSize" min="1" max="150" value="20">
+                </div>
+
+                <div class="action-row">
+                    <button id="btnUndo" class="half-btn secondary-btn" disabled title="Undo last stroke (key: Z)">↩ Undo</button>
+                    <button id="btnRedo" class="half-btn secondary-btn" disabled title="Redo last stroke (key: Y)">↪ Redo</button>
+                </div>
+                <button id="btnResetToFm" class="full-btn warn-btn" title="Restore final mask to the original FM mask — loses all corrections">⟳ Reset to FM Mask</button>
+                <button id="btnClearMask" class="full-btn danger-btn" title="Set entire mask to black (no flood anywhere)">✕ Clear Final Mask</button>
+            </div>
+        </div>
+
+        <!-- 5. Quality Stats -->
+        <div class="ctrl-group">
+            <div class="group-header collapsed" data-target="statsContent">
+                <span>5. Quality Stats</span><span class="chevron">▾</span>
+            </div>
+            <div class="group-content hidden" id="statsContent">
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="stat-label">FM changed px</div>
+                        <div class="stat-val" id="statFmPx">—</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">Final changed px</div>
+                        <div class="stat-val" id="statFinalPx">—</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">Added px</div>
+                        <div class="stat-val stat-add-color" id="statAddedPx">—</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">Removed px</div>
+                        <div class="stat-val stat-rem-color" id="statRemovedPx">—</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">Correction %</div>
+                        <div class="stat-val" id="statCorrPct">—</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">Changed area %</div>
+                        <div class="stat-val" id="statAreaPct">—</div>
+                    </div>
+                </div>
+                <div id="statsWarnings" class="stats-warnings"></div>
+                <button id="btnRefreshStats" class="full-btn secondary-btn" style="margin-top:8px">↺ Refresh Stats</button>
+            </div>
+        </div>
+
+        <!-- 6. Export -->
+        <div class="ctrl-group">
+            <div class="group-header collapsed" data-target="exportContent">
+                <span>6. Export</span><span class="chevron">▾</span>
+            </div>
+            <div class="group-content hidden" id="exportContent">
+                <button id="btnDownloadFinal" class="full-btn export-primary-btn" title="Binary PNG: white=flood/change, black=no-change">↓ Final Corrected Mask</button>
+                <button id="btnDownloadDiff" class="full-btn export-sec-btn" title="RGB diff PNG: green=added, blue=removed, yellow=unchanged flood">↓ Correction Diff Mask</button>
+                <button id="btnDownloadPreview" class="full-btn export-sec-btn" title="Visual RGB preview with overlays">↓ Preview Image</button>
+                <button id="btnDownloadMeta" class="full-btn export-sec-btn" title="JSON file with all annotation metadata and pixel statistics">↓ Metadata JSON</button>
+            </div>
+        </div>
+
+    </aside>
+
+    <!-- ── Main Canvas Area ── -->
+    <main class="main-view" id="mainView">
+        <canvas id="displayCanvas"></canvas>
+
+        <div class="canvas-legend" id="canvasLegend">
+            <div class="legend-row"><span class="swatch" style="background:rgba(220,50,50,0.8)"></span>Final flood</div>
+            <div class="legend-row"><span class="swatch" style="background:rgba(255,140,0,0.8)"></span>FM reference</div>
+            <div class="legend-row"><span class="swatch" style="background:rgba(50,200,80,0.8)"></span>Added (diff)</div>
+            <div class="legend-row"><span class="swatch" style="background:rgba(80,120,255,0.8)"></span>Removed (diff)</div>
+            <div class="legend-row"><span class="swatch" style="background:rgba(220,200,50,0.8)"></span>Unchanged flood (diff)</div>
+        </div>
+
+        <div id="loadingOverlay" class="loading-overlay hidden">
+            <div class="spinner"></div>
+            <p>Loading…</p>
+        </div>
+
+        <div id="toastContainer" class="toast-container"></div>
+    </main>
+</div>
+
+<!-- ── Help Modal ── -->
+<div id="helpModal" class="modal-backdrop hidden">
+    <div class="modal-box">
+        <div class="modal-head">
+            <h2>Help &amp; Instructions</h2>
+            <button id="btnCloseHelp" class="modal-close" title="Close (Esc)">✕</button>
+        </div>
+        <div class="modal-body">
+            <h3>What is this tool?</h3>
+            <p>This tool helps you correct flood/change masks generated by AI foundation models. The AI gives an approximate mask — your job is to fix false positives and false negatives.</p>
+
+            <h3>Mask Convention</h3>
+            <div class="convention-box">
+                <div><strong class="text-flood">White / 255 = Flood or Change</strong></div>
+                <div><strong>Black / 0 = No flood / No change / Background</strong></div>
+            </div>
+
+            <h3>Step-by-step Workflow</h3>
+            <ol>
+                <li>Load the <strong>ON/FLOOD</strong> image — this is the main base image.</li>
+                <li>Load the <strong>BEFORE</strong> image — used for visual comparison.</li>
+                <li>Load the <strong>FM Approx. Mask</strong> — the AI's prediction, becomes your starting mask.</li>
+                <li>The <span style="color:#f47">red overlay</span> shows the current flood prediction.</li>
+                <li>Use <strong>Add Flood (A)</strong> to paint missed flood areas (adds white).</li>
+                <li>Use <strong>Remove Flood (R)</strong> to erase wrongly predicted areas (adds black).</li>
+                <li>Toggle <strong>BEFORE overlay</strong> to compare before/after the event.</li>
+                <li>Enable <strong>Correction Diff</strong> to review what you changed.</li>
+                <li>Export the <strong>Final Corrected Mask</strong> when satisfied.</li>
+            </ol>
+
+            <h3>Tools</h3>
+            <ul>
+                <li><strong>Add Flood (A)</strong> — Paints WHITE = flood/change pixels</li>
+                <li><strong>Remove Flood (R)</strong> — Paints BLACK = no-change pixels</li>
+                <li><strong>Pan (P)</strong> — Drag to move the view</li>
+                <li><strong>Scroll wheel</strong> — Zoom in/out centered on cursor</li>
+            </ul>
+
+            <h3>Correction Diff Colors</h3>
+            <ul>
+                <li><span style="color:#32c850;font-weight:600">■ Green</span> — You added flood (AI missed it)</li>
+                <li><span style="color:#5078ff;font-weight:600">■ Blue</span> — You removed flood (AI was wrong)</li>
+                <li><span style="color:#dcc832;font-weight:600">■ Yellow</span> — Unchanged flood (AI was correct, you kept it)</li>
+                <li>Transparent — No flood in either mask</li>
+            </ul>
+
+            <h3>Keyboard Shortcuts</h3>
+            <table class="shortcut-table">
+                <tr><th>Key</th><th>Action</th></tr>
+                <tr><td>A</td><td>Add Flood tool</td></tr>
+                <tr><td>R</td><td>Remove Flood tool</td></tr>
+                <tr><td>P</td><td>Pan tool</td></tr>
+                <tr><td>Z</td><td>Undo</td></tr>
+                <tr><td>Y</td><td>Redo</td></tr>
+                <tr><td>[ / ]</td><td>Brush size −2 / +2 px</td></tr>
+                <tr><td>= or +</td><td>Zoom in</td></tr>
+                <tr><td>−</td><td>Zoom out</td></tr>
+                <tr><td>0</td><td>Fit image to screen</td></tr>
+                <tr><td>F</td><td>Toggle final mask overlay</td></tr>
+                <tr><td>M</td><td>Toggle FM reference overlay</td></tr>
+                <tr><td>D</td><td>Toggle diff overlay</td></tr>
+                <tr><td>Space (hold)</td><td>Temporary pan</td></tr>
+                <tr><td>H or ?</td><td>Open this help</td></tr>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ── Autosave Recovery Modal ── -->
+<div id="autosaveModal" class="modal-backdrop hidden">
+    <div class="modal-box modal-sm">
+        <div class="modal-head">
+            <h2>Autosave Found</h2>
+        </div>
+        <div class="modal-body">
+            <p id="autosaveMsg">An autosaved correction was found for this sample.</p>
+            <div class="modal-actions">
+                <button id="btnRestoreAutosave" class="full-btn primary-btn">Restore Autosave</button>
+                <button id="btnIgnoreAutosave" class="full-btn secondary-btn">Ignore — Start Fresh</button>
+                <button id="btnDeleteAutosave" class="full-btn danger-btn">Delete Autosave</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
