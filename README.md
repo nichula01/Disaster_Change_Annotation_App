@@ -4,6 +4,7 @@ A single-page, zero-dependency browser tool for correcting AI-generated flood/ch
 
 All processing happens locally in the browser. No backend, no build step, no npm required.
 
+
 ---
 
 ## How to Run
