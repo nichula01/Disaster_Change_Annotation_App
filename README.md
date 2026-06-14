@@ -7,6 +7,7 @@ All processing happens locally in the browser. No backend, no build step, no npm
 
 ---
 
+
 ## How to Run
 
 ```bash
