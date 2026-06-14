@@ -105,6 +105,7 @@ Optional:
 
 ---
 
+
 ## UI Features
 
 - **Status bar** — shows sample ID, load status, current tool, brush size, and zoom level.
