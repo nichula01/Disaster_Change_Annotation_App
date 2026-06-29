@@ -1,5 +1,4 @@
 
-
 const S = {
     // Loaded images (HTMLImageElement)
     onImage: null,
