@@ -1,7 +1,4 @@
-/**
- * FM Flood Mask Correction Tool
- * Mask convention: white (255) = flood/change, black (0) = no flood/no change
- */
+
 
 
 // STATE
